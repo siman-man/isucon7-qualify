@@ -8,7 +8,6 @@ require 'httpclient'
 require 'rack-mini-profiler'
 require 'rack-lineprof'
 
-
 def file_initialize
   first_images = db.query('select distinct name from image where id <= 1001', as: :array).to_a.flatten.map{|a|[a,true]}.to_h
   Dir.glob(File.expand_path('../public/icons/*.*', __dir__)).each do |path|
@@ -16,15 +15,12 @@ def file_initialize
   end
 end
 
-
 def onmem_initialize
   User.init
   Channel.init
   ChannelMessageIds.init
   ReadCount.init
 end
-
-onmem_initialize
 
 def onmem_fetch
   User.fetch
@@ -53,6 +49,17 @@ WorkerCast.start ServerList, SelfServer do |data|
     'ok'
   end
 end
+
+loop do
+  begin
+    onmem_initialize
+    break
+  rescue StandardError
+    p 'load db error'
+    sleep 5
+  end
+end
+
 
 class App < Sinatra::Base
   configure do
