@@ -1,5 +1,5 @@
 require 'worker_cast'
-if `ls /Applications` # local
+if `ls /Applications` != '' # local
   ServerList = {
     app1: 'localhost:9876'
   }
