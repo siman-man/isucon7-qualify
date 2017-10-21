@@ -334,11 +334,11 @@ class App < Sinatra::Base
     end
 
     if !avatar_name.nil? && !avatar_data.nil?
-      statement = db.prepare('INSERT INTO image (name, data) VALUES (?, ?)')
-      statement.execute(avatar_name, avatar_data)
-      statement.close
-      puts WorkerCast.broadcast ['image', WorkerCast.server_name, avatar_name]
-
+      path = File.expand_path("../public/icons/#{avatar_name}", __dir__)
+      unless File.exist? path
+        File.write path, avatar_data
+      end
+      puts WorkerCast.broadcast ['image', WorkerCast.server_name, avatar_name], include_self: false
       statement = db.prepare('UPDATE user SET avatar_icon = ? WHERE id = ?')
       statement.execute(avatar_name, user['id'])
       statement.close
