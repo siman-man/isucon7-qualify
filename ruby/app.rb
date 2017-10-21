@@ -1,6 +1,7 @@
 require 'digest/sha1'
 require 'mysql2'
 require 'sinatra/base'
+require 'erubis'
 require_relative './db'
 require_relative './sync'
 require 'httpclient'
