@@ -19,7 +19,7 @@ WorkerCast.start ServerList, SelfServer do |data|
     path = File.expand_path("../public/icons/#{data[2]}", __dir__)
     begin
       unless File.exist? path
-        url = "http://#{ServerList[server].split(':').first}/icons/#{data[1]}"
+        url = "http://#{ServerList[server].split(':').first}/icons/#{data[2]}"
         File.write path, HTTPClient.get(url).body
       end
     rescue StandardError
