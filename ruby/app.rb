@@ -226,6 +226,8 @@ class App < Sinatra::Base
       return redirect '/login', 303
     end
 
+    User.fetch
+
     @channel_id = params[:channel_id].to_i
 
     @page = params[:page]
