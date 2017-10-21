@@ -5,6 +5,18 @@ require_relative './db'
 require_relative './sync'
 require 'httpclient'
 
+$fetch_cond = ConditionVariable.new
+$fetch_mutex = Mutex.new
+def wait_for_new_fetch(timeout=1)
+  $fetch_mutex.synchronize do
+    $fetch_cond.wait($fetch_mutex, timeout)
+  end
+end
+
+def notify_fetch
+  $fetch_cond.broadcast
+end
+
 def file_initialize
   first_images = db.query('select distinct name from image where id <= 1001', as: :array).to_a.flatten.map{|a|[a,true]}.to_h
   Dir.glob(File.expand_path('../public/icons/*.*', __dir__)).each do |path|
@@ -26,6 +38,8 @@ WorkerCast.start ServerList, SelfServer do |data|
       'err'
     end
     'ok'
+  when 'fetch'
+    notify_fetch
   when 'initialize'
     file_initialize
     'ok'
@@ -182,7 +196,7 @@ class App < Sinatra::Base
       return 403
     end
 
-    sleep 1.0
+    wait_for_new_fetch
 
     rows = db.query('SELECT id FROM channel').to_a
     channel_ids = rows.map { |row| row['id'] }
@@ -366,6 +380,7 @@ class App < Sinatra::Base
     statement = db.prepare('INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())')
     messages = statement.execute(channel_id, user_id, content)
     statement.close
+    WorkerCast.broadcast ['fetch'], response: false
     messages
   end
 
