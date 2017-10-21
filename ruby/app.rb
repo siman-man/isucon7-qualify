@@ -3,6 +3,7 @@ require 'mysql2'
 require 'sinatra/base'
 require_relative './db'
 require_relative './sync'
+require_relative './fetch_cache'
 require 'httpclient'
 
 def file_initialize
@@ -10,6 +11,23 @@ def file_initialize
   Dir.glob(File.expand_path('../public/icons/*.*', __dir__)).each do |path|
     FileUtils.remove_file(path) unless first_images.include? File.basename(path)
   end
+end
+
+
+def onmem_initialize
+  User.init
+  Channel.init
+  ChannelMessageIds.init
+  ReadCount.init
+end
+
+onmem_initialize
+
+def onmem_fetch
+  User.fetch
+  Channel.fetch
+  ChannelMessageIds.fetch
+  ReadCount.fetch
 end
 
 WorkerCast.start ServerList, SelfServer do |data|
@@ -28,6 +46,7 @@ WorkerCast.start ServerList, SelfServer do |data|
     'ok'
   when 'initialize'
     file_initialize
+    onmem_initialize
     'ok'
   end
 end
@@ -182,27 +201,18 @@ class App < Sinatra::Base
       return 403
     end
 
-    sleep 1.0
+    sleep 0.25
+
+    onmem_fetch
 
     rows = db.query('SELECT id FROM channel').to_a
-    channel_ids = rows.map { |row| row['id'] }
 
-    res = []
-    channel_ids.each do |channel_id|
-      statement = db.prepare('SELECT * FROM haveread WHERE user_id = ? AND channel_id = ?')
-      row = statement.execute(user_id, channel_id).first
-      statement.close
-      r = {}
-      r['channel_id'] = channel_id
-      r['unread'] = if row.nil?
-        statement = db.prepare('SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?')
-        statement.execute(channel_id).first['cnt']
-      else
-        statement = db.prepare('SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id')
-        statement.execute(channel_id, row['message_id']).first['cnt']
-      end
-      statement.close
-      res << r
+    res = Channel.list.map do |channel|
+      channel_id = channel['id'.freeze]
+      {
+        channel_id: channel_id,
+        unread: ChannelMessageIds.message_ids(channel_id).size - ReadCount.user_channel_reads(user_id, channel_id)
+      }
     end
 
     content_type :json
