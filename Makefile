@@ -44,7 +44,7 @@ db-slow-query: ## tail slow query log
 	@sudo tail -f /var/log/mysql/mysql-slow.log
 
 alp: ## nginx analyzer
-	@sudo /usr/local/bin/alp -f /var/log/nginx/access.log  --sum  -r --aggregates '/icons/\w+, /channel/\d+, /profile/\w+' --start-time-duration 5m --include-statuses='20[0-9],30[0-2]'
+	@sudo /usr/local/bin/alp -f /var/log/nginx/access.log  --sum  -r --aggregates '/icons/\w+, /channel/\d+, /profile/\w+, /history/\d+' --start-time-duration 2m --include-statuses='20[0-9],30[0-2]'
 bench: ## Run benchmark
 	../benchmark --workload 3
 
