@@ -172,22 +172,24 @@ class App < Sinatra::Base
       return 403
     end
 
+    User.fetch
     channel_id = params[:channel_id].to_i
     last_message_id = params[:last_message_id].to_i
     statement = db.prepare('SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100')
     rows = statement.execute(last_message_id, channel_id).to_a
-    response = []
-    rows.each do |row|
-      r = {}
-      r['id'] = row['id']
-      statement = db.prepare('SELECT name, display_name, avatar_icon FROM user WHERE id = ?')
-      r['user'] = statement.execute(row['user_id']).first
-      r['date'] = row['created_at'].strftime("%Y/%m/%d %H:%M:%S")
-      r['content'] = row['content']
-      response << r
-      statement.close
-    end
-    response.reverse!
+    response = rows.map do |row|
+      user = User.find(row['user_id'.freeze])
+      {
+        id: row['id'.freeze],
+        user: {
+          name: user['name'.freeze],
+          display_name: user['display_name'.freeze],
+          avatar_icon: user['avatar_icon'.freeze]
+        },
+        date: row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
+        content: row['content']
+      }
+    end.reverse
 
     max_message_id = rows.empty? ? 0 : rows.map { |row| row['id'] }.max
     statement = db.prepare([
@@ -230,6 +232,8 @@ class App < Sinatra::Base
       return redirect '/login', 303
     end
 
+    User.fetch
+
     @channel_id = params[:channel_id].to_i
 
     @page = params[:page]
@@ -245,18 +249,19 @@ class App < Sinatra::Base
     statement = db.prepare('SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?')
     rows = statement.execute(@channel_id, n, (@page - 1) * n).to_a
     statement.close
-    @messages = []
-    rows.each do |row|
-      r = {}
-      r['id'] = row['id']
-      statement = db.prepare('SELECT name, display_name, avatar_icon FROM user WHERE id = ?')
-      r['user'] = statement.execute(row['user_id']).first
-      r['date'] = row['created_at'].strftime("%Y/%m/%d %H:%M:%S")
-      r['content'] = row['content']
-      @messages << r
-      statement.close
-    end
-    @messages.reverse!
+    @messages = rows.map do |row|
+      user = User.find(row['user_id'.freeze])
+      {
+        'id' => row['id'.freeze],
+        'user' => {
+          'name' => user['name'.freeze],
+          'display_name' => user['display_name'.freeze],
+          'avatar_icon' => user['avatar_icon'.freeze]
+        },
+        'date' => row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
+        'content' => row['content']
+      }
+    end.reverse
 
     statement = db.prepare('SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?')
     cnt = statement.execute(@channel_id).first['cnt'].to_f

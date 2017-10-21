@@ -6,7 +6,7 @@ class User
       fetch
     end
 
-    def get id
+    def find id
       @users[id]
     end
 
@@ -73,7 +73,6 @@ class ChannelMessageIds
 
     def message_count_lte channel_id, message_id
       ids = @message_channel_ids[channel_id]
-      p ids, message_id if channel_id==1
       ids ? ids.bsearch_index{ |i| i > message_id } || ids.size : 0
     end
 
@@ -112,7 +111,6 @@ class ReadCount
         message_id = haveread['message_id'.freeze]
         channel_id = haveread['channel_id'.freeze]
         channel_reads = @user_channel_reads[haveread['user_id'.freeze]] ||= Hash.new
-        p haveread
         channel_reads[channel_id] = ChannelMessageIds.message_count_lte(channel_id, message_id)
         @last_updated_at = haveread['updated_at'.freeze]
       end
