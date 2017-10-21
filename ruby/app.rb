@@ -5,6 +5,9 @@ require_relative './db'
 require_relative './sync'
 require_relative './fetch_cache'
 require 'httpclient'
+require 'rack-mini-profiler'
+require 'rack-lineprof'
+
 
 def file_initialize
   first_images = db.query('select distinct name from image where id <= 1001', as: :array).to_a.flatten.map{|a|[a,true]}.to_h
@@ -56,6 +59,9 @@ class App < Sinatra::Base
     set :session_secret, 'tonymoris'
     set :public_folder, File.expand_path('../../public', __FILE__)
     set :avatar_max_size, 1 * 1024 * 1024
+
+    use Rack::Lineprof if ENV['DEBUG']
+    use Rack::MiniProfiler if ENV['DEBUG']
 
     enable :sessions
   end
