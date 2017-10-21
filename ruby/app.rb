@@ -246,14 +246,14 @@ class App < Sinatra::Base
     @messages = rows.map do |row|
       user = User.find(row['user_id'.freeze])
       {
-        id: row['id'.freeze],
-        user: {
-          name: user['name'.freeze],
-          display_name: user['display_name'.freeze],
-          avatar_icon: user['avatar_icon'.freeze]
+        'id' => row['id'.freeze],
+        'user' => {
+          'name' => user['name'.freeze],
+          'display_name' => user['display_name'.freeze],
+          'avatar_icon' => user['avatar_icon'.freeze]
         },
-        date: row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
-        content: row['content']
+        'date' => row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
+        'content' => row['content']
       }
     end.reverse
 
