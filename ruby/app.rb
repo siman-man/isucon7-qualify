@@ -2,6 +2,35 @@ require 'digest/sha1'
 require 'mysql2'
 require 'sinatra/base'
 require_relative './db'
+require_relative './sync'
+require 'httpclient'
+
+def file_initialize
+  first_images = db.query('select distinct name from image where id <= 1001', as: :array).to_a.flatten.map{|a|[a,true]}.to_h
+  Dir.glob(File.expand_path('../public/icons/*.*', __dir__)).each do |path|
+    FileUtils.remove_file(path) unless first_images.include? File.basename(path)
+  end
+end
+
+WorkerCast.start ServerList, SelfServer do |data|
+  case data[0]
+  when 'image'
+    server = data[1].to_sym
+    path = File.expand_path("../public/icons/#{data[2]}", __dir__)
+    begin
+      unless File.exist? path
+        url = "http://#{ServerList[server].split(':').first}/icons/#{data[2]}"
+        File.write path, HTTPClient.get(url).body
+      end
+    rescue StandardError
+      'err'
+    end
+    'ok'
+  when 'initialize'
+    file_initialize
+    'ok'
+  end
+end
 
 class App < Sinatra::Base
   configure do
@@ -40,6 +69,7 @@ class App < Sinatra::Base
     db.query("DELETE FROM channel WHERE id > 10")
     db.query("DELETE FROM message WHERE id > 10000")
     db.query("DELETE FROM haveread")
+    WorkerCast.broadcast ['initialize']
     204
   end
 
@@ -304,9 +334,11 @@ class App < Sinatra::Base
     end
 
     if !avatar_name.nil? && !avatar_data.nil?
-      statement = db.prepare('INSERT INTO image (name, data) VALUES (?, ?)')
-      statement.execute(avatar_name, avatar_data)
-      statement.close
+      path = File.expand_path("../public/icons/#{avatar_name}", __dir__)
+      unless File.exist? path
+        File.write path, avatar_data
+      end
+      puts WorkerCast.broadcast ['image', WorkerCast.server_name, avatar_name], include_self: false
       statement = db.prepare('UPDATE user SET avatar_icon = ? WHERE id = ?')
       statement.execute(avatar_name, user['id'])
       statement.close
@@ -319,20 +351,6 @@ class App < Sinatra::Base
     end
 
     redirect '/', 303
-  end
-
-  get '/icons/:file_name' do
-    file_name = params[:file_name]
-    statement = db.prepare('SELECT * FROM image WHERE name = ?')
-    row = statement.execute(file_name).first
-    statement.close
-    ext = file_name.include?('.') ? File.extname(file_name) : ''
-    mime = ext2mime(ext)
-    if !row.nil? && !mime.empty?
-      content_type mime
-      return row['data']
-    end
-    404
   end
 
   private

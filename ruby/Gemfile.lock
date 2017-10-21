@@ -1,3 +1,9 @@
+GIT
+  remote: git://github.com/tompng/worker_cast.git
+  revision: 8295602c7e4053940cabbd039e30311ff14f48b5
+  specs:
+    worker_cast (0.1.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -17,6 +23,7 @@ GEM
     coderay (1.1.2)
     concurrent-ruby (1.0.5)
     debugger-ruby_core_source (1.3.8)
+    httpclient (2.8.3)
     i18n (0.9.0)
       concurrent-ruby (~> 1.0)
     method_source (0.9.0)
@@ -64,6 +71,7 @@ PLATFORMS
 
 DEPENDENCIES
   activerecord
+  httpclient
   mysql2
   pry
   puma
@@ -71,6 +79,7 @@ DEPENDENCIES
   rack-mini-profiler
   sinatra
   sinatra-contrib
+  worker_cast!
 
 BUNDLED WITH
    1.15.4
