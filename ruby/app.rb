@@ -201,7 +201,7 @@ class App < Sinatra::Base
       return 403
     end
 
-    sleep 0.1
+    sleep 0.25
 
     onmem_fetch
 
