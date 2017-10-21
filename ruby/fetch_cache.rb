@@ -96,7 +96,7 @@ class ReadCount
 
     def fetch
       statement = db.prepare('SELECT created_at, user_id, channel_id, message_id from haveread WHERE created_at > ? order by created_at asc')
-      statement.execute(@last_created_at).each do |haveread|
+      statement.execute(@last_created_at - 1).each do |haveread|
         message_id = haveread['message_id'.freeze]
         channel_id = haveread['channel_id'.freeze]
         channel_reads = @user_channel_reads[haveread['user_id'.freeze]] ||= Hash.new
