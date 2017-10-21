@@ -12,7 +12,7 @@ def file_initialize
   end
 end
 
-WorkerCast.start ServerList, :app1 do |data|
+WorkerCast.start ServerList, SelfServer do |data|
   case data[0]
   when 'image'
     server = data[1].to_sym
