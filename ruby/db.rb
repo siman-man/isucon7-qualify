@@ -9,7 +9,7 @@ def db_config
   }
 end
 
-def db
+def db_for_initialize
   return Thread.current[:isucon7_db] if Thread.current[:isucon7_db]
   client = Mysql2::Client.new(db_config)
   Thread.current[:isucon7_db] ||= client

@@ -1,16 +1,16 @@
 class User
   class << self
-    def init
+    def init db
       @users = {}
       @last_id = 0
-      fetch
+      fetch db
     end
 
     def find id
       @users[id]
     end
 
-    def fetch
+    def fetch db
       statement = db.prepare('SELECT * from user WHERE id > ? order by id asc')
       statement.execute(@last_id).each do |user|
         id = user['id'.freeze]
@@ -24,12 +24,12 @@ end
 
 class Channel
   class << self
-    def init
+    def init db
       @id_channels = {}
       @channel_list = []
       @last_id = 0
       @mutex = Mutex.new
-      fetch
+      fetch db
     end
 
     def list
@@ -40,7 +40,7 @@ class Channel
       @id_channels[id]
     end
 
-    def fetch
+    def fetch db
       statement = db.prepare('SELECT * from channel WHERE id > ? order by id asc')
       result = statement.execute(@last_id)
       @mutex.synchronize do
@@ -60,11 +60,11 @@ end
 
 class ChannelMessageIds
   class << self
-    def init
+    def init db
       @message_channel_ids = {}
       @last_id = 0
       @mutex = Mutex.new
-      fetch
+      fetch db
     end
 
     def message_ids channel_id
@@ -76,7 +76,7 @@ class ChannelMessageIds
       ids ? ids.bsearch_index{ |i| i > message_id } || ids.size : 0
     end
 
-    def fetch
+    def fetch db
       statement = db.prepare('SELECT id, channel_id from message WHERE id > ? order by id asc')
       result = statement.execute(@last_id)
       @mutex.synchronize do
@@ -94,10 +94,10 @@ end
 
 class ReadCount
   class << self
-    def init
+    def init db
       @user_channel_reads = {}
       @last_updated_at = Time.new(0)
-      fetch
+      fetch db
     end
 
     def user_channel_reads user_id, channel_id
@@ -105,7 +105,7 @@ class ReadCount
       channel_reads ? channel_reads[channel_id] || 0 : 0
     end
 
-    def fetch
+    def fetch db
       statement = db.prepare('SELECT updated_at, user_id, channel_id, message_id from haveread WHERE updated_at > ? order by updated_at asc')
       statement.execute(@last_updated_at - 1).each do |haveread|
         message_id = haveread['message_id'.freeze]
