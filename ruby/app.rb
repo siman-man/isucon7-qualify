@@ -420,7 +420,7 @@ class App < Sinatra::Base
     statement = db.prepare('INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())')
     messages = statement.execute(channel_id, user_id, content)
     statement.close
-    WorkerCast.broadcast ['fetch']
+    WorkerCast.broadcast ['fetch'], response: false
     messages
   end
 
