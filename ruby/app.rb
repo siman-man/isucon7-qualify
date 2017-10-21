@@ -1,6 +1,7 @@
 require 'digest/sha1'
 require 'mysql2'
 require 'sinatra/base'
+require_relative './db'
 
 class App < Sinatra::Base
   configure do
@@ -241,7 +242,7 @@ class App < Sinatra::Base
     @self_profile = user['id'] == @user['id']
     erb :profile
   end
-  
+
   get '/add_channel' do
     if user.nil?
       return redirect '/login', 303
@@ -335,21 +336,6 @@ class App < Sinatra::Base
   end
 
   private
-
-  def db
-    return @db_client if defined?(@db_client)
-
-    @db_client = Mysql2::Client.new(
-      host: ENV.fetch('ISUBATA_DB_HOST') { 'localhost' },
-      port: ENV.fetch('ISUBATA_DB_PORT') { '3306' },
-      username: ENV.fetch('ISUBATA_DB_USER') { 'root' },
-      password: ENV.fetch('ISUBATA_DB_PASSWORD') { '' },
-      database: 'isubata',
-      encoding: 'utf8mb4'
-    )
-    @db_client.query('SET SESSION sql_mode=\'TRADITIONAL,NO_AUTO_VALUE_ON_ZERO,ONLY_FULL_GROUP_BY\'')
-    @db_client
-  end
 
   def db_get_user(user_id)
     statement = db.prepare('SELECT * FROM user WHERE id = ?')

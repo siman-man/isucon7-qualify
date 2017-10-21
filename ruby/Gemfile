@@ -4,3 +4,6 @@ gem 'mysql2'
 gem 'puma'
 gem 'sinatra'
 gem 'sinatra-contrib'
+
+gem 'activerecord'
+gem 'pry'
