@@ -230,7 +230,7 @@ class App < Sinatra::Base
       return 403
     end
 
-    wait_for_new_fetch
+    wait_for_new_fetch 0.25
 
     onmem_fetch
 
