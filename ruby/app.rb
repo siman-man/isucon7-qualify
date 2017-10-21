@@ -220,8 +220,6 @@ class App < Sinatra::Base
 
     onmem_fetch
 
-    rows = db.query('SELECT id FROM channel').to_a
-
     res = Channel.list.map do |channel|
       channel_id = channel['id'.freeze]
       {
