@@ -1,6 +1,8 @@
 require 'digest/sha1'
 require 'mysql2'
 require 'sinatra/base'
+require 'rack-lineprof'
+
 require_relative './db'
 
 class App < Sinatra::Base
@@ -8,6 +10,8 @@ class App < Sinatra::Base
     set :session_secret, 'tonymoris'
     set :public_folder, File.expand_path('../../public', __FILE__)
     set :avatar_max_size, 1 * 1024 * 1024
+
+    use Rack::Lineprof if ENV['DEBUG']
 
     enable :sessions
   end
