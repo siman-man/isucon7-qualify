@@ -27,18 +27,20 @@ def file_initialize
   end
 end
 
-def onmem_initialize
-  User.init
-  Channel.init
-  ChannelMessageIds.init
-  ReadCount.init
+$initdb = db_for_initialize
+
+def onmem_initialize db
+  User.init db
+  Channel.init db
+  ChannelMessageIds.init db
+  ReadCount.init db
 end
 
-def onmem_fetch
-  User.fetch
-  Channel.fetch
-  ChannelMessageIds.fetch
-  ReadCount.fetch
+def onmem_fetch db
+  User.fetch db
+  Channel.fetch db
+  ChannelMessageIds.fetch db
+  ReadCount.fetch db
 end
 
 WorkerCast.start ServerList, SelfServer do |data|
@@ -59,16 +61,17 @@ WorkerCast.start ServerList, SelfServer do |data|
     notify_fetch
   when 'initialize'
     file_initialize
-    onmem_initialize
+    onmem_initialize $initdb
     'ok'
   end
 end
 
 loop do
   begin
-    onmem_initialize
+    onmem_initialize $initdb
     break
-  rescue StandardError
+  rescue StandardError => e
+    p e, e.backtrace
     p 'load db error'
     sleep 5
   end
@@ -193,7 +196,7 @@ class App < Sinatra::Base
       return 403
     end
 
-    User.fetch
+    User.fetch db
     channel_id = params[:channel_id].to_i
     last_message_id = params[:last_message_id].to_i
     statement = db.prepare('SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100')
@@ -232,7 +235,7 @@ class App < Sinatra::Base
 
     wait_for_new_fetch 0.25
 
-    onmem_fetch
+    onmem_fetch db
 
     res = Channel.list.map do |channel|
       channel_id = channel['id'.freeze]
@@ -251,7 +254,7 @@ class App < Sinatra::Base
       return redirect '/login', 303
     end
 
-    User.fetch
+    User.fetch db
 
     @channel_id = params[:channel_id].to_i
 
