@@ -56,58 +56,66 @@ Events['image'] = lambda do |server, filename, respond|
   end
 end
 
-cm_mutex = Mutex.new
-cm_cond = ConditionVariable.new
-cm_queue = []
-hr_mutex = Mutex.new
-hr_cond = ConditionVariable.new
-hr_queue = []
+class Task
+  def initialize interval: 0, &block
+    @mutex = Mutex.new
+    @cond = ConditionVariable.new
+    @callbacks = []
+    @block = block
+    @interval = interval
+    Thread.new { run }
+  end
 
-fetch_queue_run = lambda do
-  Thread.new do
-    loop do
-      responds = []
-      cm_mutex.synchronize do
-        cm_cond.wait cm_mutex if cm_queue.empty?
-        responds += cm_queue
-        cm_queue = []
-      end
-      ChannelMessageIds.fetch; notify_fetch;
-      responds.each { |q| q << :ok }
+  def request &callback
+    @mutex.synchronize do
+      @callbacks << callback
+      @cond.signal if @callbacks.size == 1
     end
   end
 
-  Thread.new do
+  def run
     loop do
-      responds = []
-      hr_mutex.synchronize do
-        hr_cond.wait hr_mutex if hr_queue.empty?
-        responds += hr_queue
-        hr_queue = []
+      callbacks = nil
+      @mutex.synchronize do
+        @cond.wait @mutex if @callbacks.empty?
+        callbacks = @callbacks
+        @callbacks = []
       end
-      ReadCount.fetch
-      responds.each { |q| q << :ok }
+      status = @block.call
+      callbacks.each { |callback| callback.call status }
+      sleep @interval if @interval.nonzero?
     end
   end
 end
 
-Events['message'] = lambda do |respond|
-  q = Queue.new
-  cm_mutex.synchronize do
-    cm_cond.signal if cm_queue.empty?
-    cm_queue << q
+loop do
+  begin
+    onmem_initialize
+    break
+  rescue StandardError => e
+    p e
+    sleep 5
   end
-  Thread.new { q.deq; respond.call 'ok' }
+end
+
+channelmessage_task = Task.new do
+  ChannelMessageIds.fetch
+  notify_fetch
+  :ok
+end
+
+readcount_task = Task.new do
+  ReadCount.fetch
+  :ok
+end
+
+Events['message'] = lambda do |respond|
+  channelmessage_task.request(&respond)
   :async
 end
 
 Events['haveread'] = lambda do |respond|
-  q = Queue.new
-  hr_mutex.synchronize do
-    hr_cond.signal if hr_queue.empty?
-    hr_queue << q
-  end
-  Thread.new { q.deq; respond.call 'ok' }
+  readcount_task.request(&respond)
   :async
 end
 
@@ -127,18 +135,6 @@ Events['channel'] = lambda do |channel, respond|
   Channel.update channel
   'ok'
 end
-
-loop do
-  begin
-    onmem_initialize
-    break
-  rescue StandardError => e
-    p e
-    sleep 5
-  end
-end
-
-fetch_queue_run.call
 
 class App < Sinatra::Base
   configure do
