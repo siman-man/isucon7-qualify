@@ -331,6 +331,8 @@ class App < Sinatra::Base
     sql = 'INSERT INTO channel (name, description, updated_at, created_at) VALUES (?, ?, NOW(), NOW())'
     db.xquery(sql, name, description)
     channel_id = db.last_id
+    channel = db.query("SELECT * from channel where id = #{channel_id}").first
+    WorkerCast.broadcast(['channel', channel])
     redirect "/channel/#{channel_id}", 303
   end
 
