@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'digest/sha1'
 require 'mysql2'
 require 'mysql2-cs-bind'
@@ -214,13 +216,13 @@ class App < Sinatra::Base
     rows = statement.execute(last_message_id, channel_id).to_a
     statement.close
     response = rows.map do |row|
-      user = User.find(row['user_id'.freeze])
+      user = User.find(row['user_id'])
       {
-        id: row['id'.freeze],
+        id: row['id'],
         user: {
-          name: user['name'.freeze],
-          display_name: user['display_name'.freeze],
-          avatar_icon: user['avatar_icon'.freeze]
+          name: user['name'],
+          display_name: user['display_name'],
+          avatar_icon: user['avatar_icon']
         },
         date: row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
         content: row['content']
@@ -249,7 +251,7 @@ class App < Sinatra::Base
     sleep 0.2
 
     res = Channel.list.map do |channel|
-      channel_id = channel['id'.freeze]
+      channel_id = channel['id']
       {
         channel_id: channel_id,
         unread: ChannelMessageIds.message_ids(channel_id).size - ReadCount.user_channel_reads(user_id, channel_id)
@@ -281,13 +283,13 @@ class App < Sinatra::Base
     rows = statement.execute(@channel_id, n, (@page - 1) * n).to_a
     statement.close
     @messages = rows.map do |row|
-      user = User.find(row['user_id'.freeze])
+      user = User.find(row['user_id'])
       {
-        'id' => row['id'.freeze],
+        'id' => row['id'],
         'user' => {
-          'name' => user['name'.freeze],
-          'display_name' => user['display_name'.freeze],
-          'avatar_icon' => user['avatar_icon'.freeze]
+          'name' => user['name'],
+          'display_name' => user['display_name'],
+          'avatar_icon' => user['avatar_icon']
         },
         'date' => row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
         'content' => row['content']
