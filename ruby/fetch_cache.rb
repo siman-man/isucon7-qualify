@@ -3,7 +3,7 @@ class User
     def init
       @users = {}
       @name_users = {}
-      db.query('SELECT * from user order by id asc').each(&:update)
+      db.query('SELECT * from user order by id asc').each { |user| update user }
     end
 
     def update user
@@ -20,7 +20,7 @@ class User
 
     def update user
       @users[user['id']] = user
-      @users[user['name']] = user
+      @name_users[user['name']] = user
     end
   end
 end
@@ -30,7 +30,7 @@ class Channel
     def init
       @id_channels = {}
       @channel_list = []
-      db.query('SELECT * from channel order by id asc').each(&:update)
+      db.query('SELECT * from channel order by id asc').each { |channel| update channel }
     end
 
     def list
@@ -41,6 +41,7 @@ class Channel
       id = channel['id']
       return if @id_channels[id]
       @id_channels[id] = channel
+      last = @channel_list.last
       if last && last['id'] > id
         @channel_list = (@channel_list + [channel]).sort_by { |a| a['id'] }
       else

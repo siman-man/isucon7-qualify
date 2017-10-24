@@ -81,8 +81,8 @@ loop do
   begin
     onmem_initialize
     break
-  rescue StandardError
-    p 'load db error'
+  rescue StandardError => e
+    p e
     sleep 5
   end
 end
@@ -178,7 +178,7 @@ class App < Sinatra::Base
   end
 
   post '/login' do
-    row = User.find_by_name name
+    row = User.find_by_name params[:name]
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
     end
@@ -210,8 +210,9 @@ class App < Sinatra::Base
 
     channel_id = params[:channel_id].to_i
     last_message_id = params[:last_message_id].to_i
-    sql = 'SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100'
-    rows = db.xquery(sql, last_message_id, channel_id).to_a
+    statement = db.prepare('SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100')
+    rows = statement.execute(last_message_id, channel_id).to_a
+    statement.close
     response = rows.map do |row|
       user = User.find(row['user_id'.freeze])
       {
@@ -405,7 +406,6 @@ class App < Sinatra::Base
   def db_add_message(channel_id, user_id, content)
     messages = db.xquery('INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())', channel_id, user_id, content)
     WorkerCast.broadcast ['fetch'], response: false
-    messages
   end
 
   def random_string(n)
@@ -425,7 +425,7 @@ class App < Sinatra::Base
 
   def get_channel_list_info(focus_channel_id = nil)
     channels = Channel.list
-    channel = Channel.find[focus_channel_id]
+    channel = Channel.find focus_channel_id
     description = channel['description'] if channel
     [channels, description]
   end
