@@ -36,7 +36,6 @@ def onmem_initialize
 end
 
 def onmem_fetch
-  Channel.fetch
   ChannelMessageIds.fetch
   ReadCount.fetch
 end
@@ -68,6 +67,14 @@ Events['initialize'] = lambda do
   file_initialize
   onmem_initialize
   'ok'
+end
+
+Events['user'] = lambda do |user|
+  User.update user
+end
+
+Events['channel'] = lambda do |channel|
+  Channel.update channel
 end
 
 loop do
@@ -109,7 +116,7 @@ class App < Sinatra::Base
       user_id = session[:user_id]
       return nil if user_id.nil?
 
-      @_user = db_get_user(user_id)
+      @_user = User.find(user_id)
       if @_user.nil?
         params[:user_id] = nil
         return nil
@@ -171,8 +178,7 @@ class App < Sinatra::Base
   end
 
   post '/login' do
-    name = params[:name]
-    row = db.xquery('SELECT * FROM user WHERE name = ?', name).first
+    row = User.find_by_name name
     if row.nil? || row['password'] != Digest::SHA1.hexdigest(row['salt'] + params[:password])
       return 403
     end
@@ -303,7 +309,7 @@ class App < Sinatra::Base
     end
 
     @channels, = get_channel_list_info
-    @user = db.xquery('SELECT * FROM user WHERE name = ?', params[:user_name]).first
+    @user = User.find_by_name params[:user_name]
 
     if @user.nil?
       return 404
@@ -396,24 +402,6 @@ class App < Sinatra::Base
 
   private
 
-  # def db
-  #   return @db_client if defined?(@db_client)
-  #   @db_client = Mysql2::Client.new(
-  #     host: ENV.fetch('ISUBATA_DB_HOST') { 'localhost' },
-  #     port: ENV.fetch('ISUBATA_DB_PORT') { '3306' },
-  #     username: ENV.fetch('ISUBATA_DB_USER') { 'root' },
-  #     password: ENV.fetch('ISUBATA_DB_PASSWORD') { '' },
-  #     database: 'isubata',
-  #     encoding: 'utf8mb4'
-  #   )
-  #   @db_client.xquery('SET SESSION sql_mode=\'TRADITIONAL,NO_AUTO_VALUE_ON_ZERO,ONLY_FULL_GROUP_BY\'')
-  #   @db_client
-  # end
-
-  def db_get_user(user_id)
-    db.xquery('SELECT * FROM user WHERE id = ?', user_id).first
-  end
-
   def db_add_message(channel_id, user_id, content)
     messages = db.xquery('INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())', channel_id, user_id, content)
     WorkerCast.broadcast ['fetch'], response: false
@@ -436,27 +424,9 @@ class App < Sinatra::Base
   end
 
   def get_channel_list_info(focus_channel_id = nil)
-    channels = db.xquery('SELECT * FROM channel ORDER BY id').to_a
-    description = ''
-    channels.each do |channel|
-      if channel['id'] == focus_channel_id
-        description = channel['description']
-        break
-      end
-    end
+    channels = Channel.list
+    channel = Channel.find[focus_channel_id]
+    description = channel['description'] if channel
     [channels, description]
-  end
-
-  def ext2mime(ext)
-    if ['.jpg', '.jpeg'].include?(ext)
-      return 'image/jpeg'
-    end
-    if ext == '.png'
-      return 'image/png'
-    end
-    if ext == '.gif'
-      return 'image/gif'
-    end
-    ''
   end
 end
