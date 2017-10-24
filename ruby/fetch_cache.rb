@@ -68,10 +68,6 @@ class ChannelMessageIds
       @message_channel_ids[channel_id] || []
     end
 
-    def message_count channel_id
-      @message_channel_ids[channel_id]&.size || 0
-    end
-
     def message_count_lte channel_id, message_id
       ids = @message_channel_ids[channel_id]
       ids ? ids.bsearch_index{ |i| i > message_id } || ids.size : 0

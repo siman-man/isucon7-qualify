@@ -59,10 +59,12 @@ end
 Events['message'] = lambda do
   ChannelMessageIds.fetch
   notify_fetch
+  'ok'
 end
 
 Events['haveread'] = lambda do
   ReadCount.fetch
+  'ok'
 end
 
 Events['initialize'] = lambda do
@@ -73,10 +75,13 @@ end
 
 Events['user'] = lambda do |user|
   User.update user
+  $message_json_cache = []
+  'ok'
 end
 
 Events['channel'] = lambda do |channel|
   Channel.update channel
+  'ok'
 end
 
 loop do
@@ -204,32 +209,60 @@ class App < Sinatra::Base
     204
   end
 
+  def message_json_cached id, serialized
+    arr = $message_json_cache ||= []
+    data = arr[id%10000]
+    return if !data || data[0] != id
+    if serialized
+      return data[2] ||= data[1].to_json
+    else
+      return data[1]
+    end
+  end
+
+  def message_jsons ids, serialized: true
+    id_jsons = ids.map { |id| [id, message_json_cached(id, serialized)] }
+    missings = id_jsons.map { |id, json| id unless json }.compact
+    founds = missings.zip(message_jsons_cache missings, serialized).to_h
+    id_jsons.map { |id, json| json || founds[id] }
+  end
+
+  def message_jsons_cache ids, serialized
+    return [] if ids.empty?
+    arr = ($message_json_cache ||= [])
+    db.query("SELECT * FROM message WHERE id in (#{ids.join(', ')}) order by id asc").map do |message|
+      user = User.find(message['user_id'])
+      id = message['id']
+      json = {
+        'id' => id,
+        'user' => {
+          'name' => user['name'],
+          'display_name' => user['display_name'],
+          'avatar_icon' => user['avatar_icon']
+        },
+        'date' => message['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
+        'content' => message['content']
+      }
+      a,b,c = arr[id%10000] = [id, json, (serialized ? json.to_json : nil)]
+      serialized ? c : b
+    end
+  end
+
   get '/message' do
     user_id = session[:user_id]
-    if user_id.nil?
-      return 403
-    end
+    return 403 if user_id.nil?
 
     channel_id = params[:channel_id].to_i
     last_message_id = params[:last_message_id].to_i
-    statement = db.prepare('SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100')
-    rows = statement.execute(last_message_id, channel_id).to_a
-    statement.close
-    response = rows.map do |row|
-      user = User.find(row['user_id'])
-      {
-        id: row['id'],
-        user: {
-          name: user['name'],
-          display_name: user['display_name'],
-          avatar_icon: user['avatar_icon']
-        },
-        date: row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
-        content: row['content']
-      }
-    end.reverse
 
-    max_message_id = rows.empty? ? 0 : rows.map { |row| row['id'] }.max
+    message_ids = ChannelMessageIds.message_ids(channel_id)
+    ids = []
+    message_ids.reverse_each do |id|
+      break if id <= last_message_id || ids.size == 100
+      ids.unshift id
+    end
+
+    max_message_id = ids.max || 0
     sql = <<~SQL
       INSERT INTO haveread (user_id, channel_id, message_id, updated_at, created_at)
       VALUES (?, ?, ?, NOW(), NOW())
@@ -238,7 +271,7 @@ class App < Sinatra::Base
     db.xquery(sql, user_id, channel_id, max_message_id, max_message_id)
     WorkerCast.broadcast(['haveread'])
     content_type :json
-    response.to_json
+    "[#{message_jsons(ids).join(',')}]"
   end
 
   get '/fetch' do
@@ -279,27 +312,12 @@ class App < Sinatra::Base
     @page = @page.to_i
 
     n = 20
-    statement = db.prepare('SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?')
-    rows = statement.execute(@channel_id, n, (@page - 1) * n).to_a
-    statement.close
-    @messages = rows.map do |row|
-      user = User.find(row['user_id'])
-      {
-        'id' => row['id'],
-        'user' => {
-          'name' => user['name'],
-          'display_name' => user['display_name'],
-          'avatar_icon' => user['avatar_icon']
-        },
-        'date' => row['created_at'].strftime("%Y/%m/%d %H:%M:%S"),
-        'content' => row['content']
-      }
-    end.reverse
-
-    cnt = ChannelMessageIds.message_count(@channel_id)
+    message_ids = ChannelMessageIds.message_ids(@channel_id)
+    cnt = message_ids.size
     @max_page = cnt == 0 ? 1 : cnt.fdiv(n).ceil
-
     return 400 if @page > @max_page
+
+    @messages = message_jsons(message_ids[(@page - 1) * n, n], serialized: false)
 
     @channels, @description = get_channel_list_info(@channel_id)
     erb :history
