@@ -41,29 +41,33 @@ def onmem_fetch
   ReadCount.fetch
 end
 
+Events = {}
 WorkerCast.start ServerList, SelfServer do |data|
-  case data[0]
-  when 'image'
-    server = data[1].to_sym
-    path = File.expand_path("../public/icons/#{data[2]}", __dir__)
-    begin
-      unless File.exist? path
-        url = "http://#{ServerList[server].split(':').first}/icons/#{data[2]}"
-        File.write path, HTTPClient.get(url).body
-      end
-    rescue StandardError
-      'err'
+  name, *args = data
+  Events[name]&.call(*args)
+end
+
+Events['image'] = lambda do |server, filename|
+  path = File.expand_path("../public/icons/#{filename}", __dir__)
+  begin
+    unless File.exist? path
+      url = "http://#{ServerList[server.to_sym].split(':').first}/icons/#{filename}"
+      File.write path, HTTPClient.get(url).body
     end
     'ok'
-  when 'fetch'
-    notify_fetch
-  when 'user'
-    User.update data[1]
-  when 'initialize'
-    file_initialize
-    onmem_initialize
-    'ok'
+  rescue StandardError
+    'err'
   end
+end
+
+Events['fetch'] = lambda do
+  notify_fetch
+end
+
+Events['initialize'] = lambda do
+  file_initialize
+  onmem_initialize
+  'ok'
 end
 
 loop do
