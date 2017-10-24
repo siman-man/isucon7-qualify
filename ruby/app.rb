@@ -35,11 +35,6 @@ def onmem_initialize
   ReadCount.init
 end
 
-def onmem_fetch
-  ChannelMessageIds.fetch
-  ReadCount.fetch
-end
-
 Events = {}
 WorkerCast.start ServerList, SelfServer do |data|
   name, *args = data
@@ -59,8 +54,13 @@ Events['image'] = lambda do |server, filename|
   end
 end
 
-Events['fetch'] = lambda do
+Events['message'] = lambda do
+  ChannelMessageIds.fetch
   notify_fetch
+end
+
+Events['haveread'] = lambda do
+  ReadCount.fetch
 end
 
 Events['initialize'] = lambda do
@@ -234,7 +234,7 @@ class App < Sinatra::Base
       ON DUPLICATE KEY UPDATE message_id = ?, updated_at = NOW()
     SQL
     db.xquery(sql, user_id, channel_id, max_message_id, max_message_id)
-
+    WorkerCast.broadcast(['haveread'])
     content_type :json
     response.to_json
   end
@@ -245,9 +245,8 @@ class App < Sinatra::Base
       return 403
     end
 
-    wait_for_new_fetch 0.25
-
-    onmem_fetch
+    wait_for_new_fetch 5
+    sleep 0.2
 
     res = Channel.list.map do |channel|
       channel_id = channel['id'.freeze]
@@ -405,7 +404,7 @@ class App < Sinatra::Base
 
   def db_add_message(channel_id, user_id, content)
     messages = db.xquery('INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())', channel_id, user_id, content)
-    WorkerCast.broadcast ['fetch'], response: false
+    WorkerCast.broadcast ['message']
   end
 
   def random_string(n)
