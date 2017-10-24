@@ -38,12 +38,12 @@ def onmem_initialize
 end
 
 Events = {}
-WorkerCast.start ServerList, SelfServer do |data|
+WorkerCast.start ServerList, SelfServer do |data, respond|
   name, *args = data
-  Events[name]&.call(*args)
+  Events[name]&.call(*args, respond)
 end
 
-Events['image'] = lambda do |server, filename|
+Events['image'] = lambda do |server, filename, respond|
   path = File.expand_path("../public/icons/#{filename}", __dir__)
   begin
     unless File.exist? path
@@ -56,30 +56,74 @@ Events['image'] = lambda do |server, filename|
   end
 end
 
-Events['message'] = lambda do
-  ChannelMessageIds.fetch
-  notify_fetch
-  'ok'
+cm_mutex = Mutex.new
+cm_cond = ConditionVariable.new
+cm_queue = []
+hr_mutex = Mutex.new
+hr_cond = ConditionVariable.new
+hr_queue = []
+
+fetch_queue_run = lambda do
+  Thread.new do
+    loop do
+      responds = []
+      cm_mutex.synchronize do
+        cm_cond.wait cm_mutex if cm_queue.empty?
+        responds += cm_queue
+        cm_queue = []
+      end
+      ChannelMessageIds.fetch; notify_fetch;
+      responds.each { |q| q << :ok }
+    end
+  end
+
+  Thread.new do
+    loop do
+      responds = []
+      hr_mutex.synchronize do
+        hr_cond.wait hr_mutex if hr_queue.empty?
+        responds += hr_queue
+        hr_queue = []
+      end
+      ReadCount.fetch
+      responds.each { |q| q << :ok }
+    end
+  end
 end
 
-Events['haveread'] = lambda do
-  ReadCount.fetch
-  'ok'
+Events['message'] = lambda do |respond|
+  q = Queue.new
+  cm_mutex.synchronize do
+    cm_cond.signal if cm_queue.empty?
+    cm_queue << q
+  end
+  Thread.new { q.deq; respond.call 'ok' }
+  :async
 end
 
-Events['initialize'] = lambda do
+Events['haveread'] = lambda do |respond|
+  q = Queue.new
+  hr_mutex.synchronize do
+    hr_cond.signal if hr_queue.empty?
+    hr_queue << q
+  end
+  Thread.new { q.deq; respond.call 'ok' }
+  :async
+end
+
+Events['initialize'] = lambda do |respond|
   file_initialize
   onmem_initialize
   'ok'
 end
 
-Events['user'] = lambda do |user|
+Events['user'] = lambda do |user, respond|
   User.update user
   $message_json_cache = []
   'ok'
 end
 
-Events['channel'] = lambda do |channel|
+Events['channel'] = lambda do |channel, respond|
   Channel.update channel
   'ok'
 end
@@ -94,6 +138,7 @@ loop do
   end
 end
 
+fetch_queue_run.call
 
 class App < Sinatra::Base
   configure do
