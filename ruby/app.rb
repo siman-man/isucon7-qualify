@@ -294,8 +294,8 @@ class App < Sinatra::Base
       }
     end.reverse
 
-    cnt = db.xquery('SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?', @channel_id).first['cnt'].to_f
-    @max_page = cnt == 0 ? 1 :(cnt / n).ceil
+    cnt = ChannelMessageIds.message_count(@channel_id)
+    @max_page = cnt == 0 ? 1 : cnt.fdiv(n).ceil
 
     return 400 if @page > @max_page
 
