@@ -88,6 +88,10 @@ class App < Sinatra::Base
     enable :sessions
   end
 
+  configure :production do
+    set :show_exceptions, true
+  end
+
   configure :development do
     require 'sinatra/reloader'
     register Sinatra::Reloader
