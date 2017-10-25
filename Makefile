@@ -10,7 +10,7 @@ restart: ## copy configs from repository to conf
 
 app: ## copy configs from repository to conf
 	@sudo cp config/nginx.conf /etc/nginx/
-	@sudo /usr/sbin/nginx -t
+	@sudo /usr/local/nginx/sbin/nginx -t
 	@make -s nginx-restart
 	@make -s ruby-restart
 
@@ -28,7 +28,9 @@ db-restart: #Restart mysql
 	@sudo service mysql restart
 
 nginx-restart: ## Restart nginx
-	@sudo service nginx restart
+	sudo cp config/nginx.service /lib/systemd/system/nginx.service
+	sudo systemctl daemon-reload
+	sudo systemctl restart nginx
 	@echo 'Restart nginx'
 
 nginx-reset-log: ## reest log and restart nginx
