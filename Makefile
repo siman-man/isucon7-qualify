@@ -15,14 +15,17 @@ app: ## copy configs from repository to conf
 	@make -s ruby-restart
 
 ruby-restart: ## Restart isuxi.ruby
-	@cd ruby;bundle install > /dev/null
+	@cd ruby;/home/isucon/local/ruby/bin/bundle install --path=vendor/bundle > /dev/null
 	@sudo systemctl restart isubata.ruby
 	@echo 'Restart isubata.ruby'
 
-mysql: ## Restart mysql
+mysql: ## Restart db server
 	@sudo cp config/my.cnf /etc/mysql/
 	@sudo service mysql restart
 	@echo 'Restart mysql'
+
+db-restart: #Restart mysql
+	@sudo service mysql restart
 
 nginx-restart: ## Restart nginx
 	@sudo service nginx restart
@@ -48,8 +51,28 @@ alp: ## nginx analyzer
 bench: ## Run benchmark
 	../benchmark --workload 3
 
-unicorn: # Run Unicorn
+unicorn: ## Run Unicorn
 	@cd ruby;bundle exec unicorn -c unicorn_config.rb
+
+puma: ## Run Puma
+	@cd ruby; /home/isucon/local/ruby/bin/bundle exec puma -p 5000 -t 10
+
+install-goose: ## Install Goose
+	go get bitbucket.org/liamstask/goose/cmd/goose
+
+install-alp: ## Install alp
+	wget https://github.com/tkuchiki/alp/releases/download/v0.3.1/alp_linux_amd64.zip
+	unzip alp_linux_amd64.zip
+	rm alp_linux_amd64.zip
+	sudo mv alp /usr/local/bin/alp
+	sudo chown root:root /usr/local/bin/alp
+
+install-myprofiler: ## Install myprofiler
+	wget https://github.com/KLab/myprofiler/releases/download/0.2/myprofiler.linux_amd64.tar.gz
+	tar xf myprofiler.linux_amd64.tar.gz
+	rm myprofiler.linux_amd64.tar.gz
+	sudo mv myprofiler /usr/local/bin
+
 
 .PHONY: help
 help:
