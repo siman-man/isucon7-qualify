@@ -358,7 +358,14 @@ class App < Sinatra::Base
     @max_page = cnt == 0 ? 1 : cnt.fdiv(n).ceil
     return 400 if @page > @max_page
 
-    @messages = message_jsons(message_ids[(@page - 1) * n, n], serialized: false)
+    ids = []
+    offset = (@page - 1) * n
+    n.times do |i|
+      id = message_ids[-1-offset-i]
+      break unless id
+      ids.unshift id
+    end
+    @messages = message_jsons(ids, serialized: false)
 
     @channels, @description = get_channel_list_info(@channel_id)
     erb :history
