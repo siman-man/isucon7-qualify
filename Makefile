@@ -1,22 +1,17 @@
 .DEFAULT_GOAL := help
 
 restart: ## copy configs from repository to conf
-	@sudo cp config/nginx.conf /etc/nginx/
-	@sudo cp config/my.cnf /etc/mysql/
-	@sudo /usr/sbin/nginx -t
 	@make -s nginx-restart
 	@make -s db-restart
 	@make -s ruby-restart
 
 app: ## copy configs from repository to conf
-	@sudo cp config/nginx.conf /etc/nginx/
-	@sudo /usr/local/nginx/sbin/nginx -t
 	@make -s nginx-restart
 	@make -s ruby-restart
 
 ruby-restart: ## Restart isuxi.ruby
 	@cd ruby;/home/isucon/local/ruby/bin/bundle install --path=vendor/bundle > /dev/null
-	@sudo systemctl restart isubata.ruby
+	sudo systemctl restart isubata.ruby
 	@echo 'Restart isubata.ruby'
 
 mysql: ## Restart db server
@@ -25,11 +20,15 @@ mysql: ## Restart db server
 	@echo 'Restart mysql'
 
 db-restart: #Restart mysql
-	@sudo service mysql restart
+	@sudo cp config/my.cnf /etc/mysql/
+	sudo systemctl restart mysql
+	@echo 'Restart mysql'
 
 nginx-restart: ## Restart nginx
+	sudo cp config/nginx.conf /etc/nginx/
 	sudo cp config/nginx.service /lib/systemd/system/nginx.service
 	sudo systemctl daemon-reload
+	sudo /usr/local/openresty/nginx/sbin/nginx -t
 	sudo systemctl restart nginx
 	@echo 'Restart nginx'
 
