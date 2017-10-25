@@ -74,8 +74,7 @@ class ChannelMessageIds
     end
 
     def fetch
-      statement = db.prepare('SELECT id, channel_id from message WHERE id > ? order by id asc')
-      result = statement.execute(@last_id)
+      result = db.xquery('SELECT id, channel_id from message WHERE id > ? order by id asc', @last_id).to_a
       @mutex.synchronize do
         result.each do |message|
           id = message['id'.freeze]
@@ -84,7 +83,6 @@ class ChannelMessageIds
           @last_id = id if id > @last_id
         end
       end
-      statement.close
     end
   end
 end
@@ -103,15 +101,14 @@ class ReadCount
     end
 
     def fetch
-      statement = db.prepare('SELECT updated_at, user_id, channel_id, message_id from haveread WHERE updated_at > ? order by updated_at asc')
-      statement.execute(@last_updated_at - 1).each do |haveread|
+      result = db.xquery('SELECT updated_at, user_id, channel_id, message_id from haveread WHERE updated_at > ? order by updated_at asc', @last_updated_at - 1)
+      result.each do |haveread|
         message_id = haveread['message_id'.freeze]
         channel_id = haveread['channel_id'.freeze]
         channel_reads = @user_channel_reads[haveread['user_id'.freeze]] ||= Hash.new
         channel_reads[channel_id] = ChannelMessageIds.message_count_lte(channel_id, message_id)
         @last_updated_at = haveread['updated_at'.freeze]
       end
-      statement.close
     end
   end
 end
