@@ -5,6 +5,7 @@ gem 'mysql2-cs-bind'
 gem 'puma'
 gem 'sinatra'
 gem 'sinatra-contrib'
+gem 'erubis'
 
 gem 'activerecord'
 gem 'pry'
