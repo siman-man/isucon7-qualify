@@ -6,6 +6,10 @@ class User
       fetch
     end
 
+    def update user
+      @users[user['id']] = user
+    end
+
     def find id
       @users[id]
     end
