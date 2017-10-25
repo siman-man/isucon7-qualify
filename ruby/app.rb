@@ -36,7 +36,6 @@ def onmem_initialize
 end
 
 def onmem_fetch
-  User.fetch
   Channel.fetch
   ChannelMessageIds.fetch
   ReadCount.fetch
@@ -58,6 +57,8 @@ WorkerCast.start ServerList, SelfServer do |data|
     'ok'
   when 'fetch'
     notify_fetch
+  when 'user'
+    User.update data[1]
   when 'initialize'
     file_initialize
     onmem_initialize
@@ -197,7 +198,6 @@ class App < Sinatra::Base
       return 403
     end
 
-    User.fetch
     channel_id = params[:channel_id].to_i
     last_message_id = params[:last_message_id].to_i
     sql = 'SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100'
@@ -254,8 +254,6 @@ class App < Sinatra::Base
     if user.nil?
       return redirect '/login', 303
     end
-
-    User.fetch
 
     @channel_id = params[:channel_id].to_i
 
@@ -377,11 +375,15 @@ class App < Sinatra::Base
       end
       puts WorkerCast.broadcast ['image', WorkerCast.server_name, avatar_name], include_self: false
       db.xquery('UPDATE user SET avatar_icon = ? WHERE id = ?', avatar_name, user['id'])
+      user['avatar_icon'] = avatar_name
     end
 
     if !display_name.nil? || !display_name.empty?
       db.xquery('UPDATE user SET display_name = ? WHERE id = ?', display_name, user['id'])
+      user['display_name'] = display_name
     end
+
+    WorkerCast.broadcast ['user', user]
 
     redirect '/', 303
   end
@@ -421,8 +423,10 @@ class App < Sinatra::Base
     pass_digest = Digest::SHA1.hexdigest(salt + password)
     sql = 'INSERT INTO user (name, salt, password, display_name, avatar_icon, created_at) VALUES (?, ?, ?, ?, ?, NOW())'
     db.xquery(sql, user, salt, pass_digest, user, 'default.png')
-    row = db.xquery('SELECT LAST_INSERT_ID() AS last_insert_id').first
-    row['last_insert_id']
+    user_id = db.last_id
+    user = db.xquery('SELECT * from user where id = ?', user_id).first
+    WorkerCast.broadcast ['user', user]
+    user_id
   end
 
   def get_channel_list_info(focus_channel_id = nil)
