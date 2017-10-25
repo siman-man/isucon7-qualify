@@ -265,7 +265,9 @@ class App < Sinatra::Base
     @page = @page.to_i
 
     n = 20
-    rows = db.xquery('SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?', @channel_id, n, (@page - 1) * n).to_a
+    statement = db.prepare('SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?')
+    rows = statement.execute(@channel_id, n, (@page - 1) * n).to_a
+    statement.close
     @messages = rows.map do |row|
       user = User.find(row['user_id'.freeze])
       {
