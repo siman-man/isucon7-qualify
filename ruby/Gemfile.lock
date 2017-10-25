@@ -1,5 +1,5 @@
 GIT
-  remote: https://github.com/tompng/worker_cast.git
+  remote: https://github.com/tompng/worker_cast
   revision: 8295602c7e4053940cabbd039e30311ff14f48b5
   specs:
     worker_cast (0.1.0)

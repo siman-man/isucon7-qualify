@@ -13,4 +13,4 @@ gem 'rack-lineprof'
 gem 'rack-mini-profiler'
 
 gem 'httpclient'
-gem 'worker_cast', github: 'tompng/worker_cast'
+gem 'worker_cast', git: 'https://github.com/tompng/worker_cast'
