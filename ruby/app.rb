@@ -122,6 +122,7 @@ end
 Events['initialize'] = lambda do |respond|
   file_initialize
   onmem_initialize
+  $message_json_cache = []
   'ok'
 end
 
