@@ -2,8 +2,8 @@ class User
   class << self
     def init
       @users = {}
-      @last_id = 0
-      fetch
+      @name_users = {}
+      db.query('SELECT * from user order by id asc').each { |user| update user }
     end
 
     def update user
@@ -14,14 +14,13 @@ class User
       @users[id]
     end
 
-    def fetch
-      statement = db.prepare('SELECT * from user WHERE id > ? order by id asc')
-      statement.execute(@last_id).each do |user|
-        id = user['id'.freeze]
-        @users[id] = user
-        @last_id = id
-      end
-      statement.close
+    def find_by_name name
+      @name_users[name]
+    end
+
+    def update user
+      @users[user['id']] = user
+      @name_users[user['name']] = user
     end
   end
 end
@@ -31,33 +30,27 @@ class Channel
     def init
       @id_channels = {}
       @channel_list = []
-      @last_id = 0
-      @mutex = Mutex.new
-      fetch
+      db.query('SELECT * from channel order by id asc').each { |channel| update channel }
     end
 
     def list
       @channel_list
     end
 
-    def find id
-      @id_channels[id]
+    def update channel
+      id = channel['id']
+      return if @id_channels[id]
+      @id_channels[id] = channel
+      last = @channel_list.last
+      if last && last['id'] > id
+        @channel_list = (@channel_list + [channel]).sort_by { |a| a['id'] }
+      else
+        @channel_list << channel
+      end
     end
 
-    def fetch
-      statement = db.prepare('SELECT * from channel WHERE id > ? order by id asc')
-      result = statement.execute(@last_id)
-      @mutex.synchronize do
-        result.each do |channel|
-          id = channel['id'.freeze]
-          if @id_channels[id].nil?
-            @id_channels[id] = channel
-            @channel_list << channel
-          end
-          @last_id = id if @last_id < id
-        end
-      end
-      statement.close
+    def find id
+      @id_channels[id]
     end
   end
 end
@@ -81,8 +74,7 @@ class ChannelMessageIds
     end
 
     def fetch
-      statement = db.prepare('SELECT id, channel_id from message WHERE id > ? order by id asc')
-      result = statement.execute(@last_id)
+      result = db.xquery('SELECT id, channel_id from message WHERE id > ? order by id asc', @last_id).to_a
       @mutex.synchronize do
         result.each do |message|
           id = message['id'.freeze]
@@ -91,7 +83,6 @@ class ChannelMessageIds
           @last_id = id if id > @last_id
         end
       end
-      statement.close
     end
   end
 end
@@ -110,15 +101,14 @@ class ReadCount
     end
 
     def fetch
-      statement = db.prepare('SELECT updated_at, user_id, channel_id, message_id from haveread WHERE updated_at > ? order by updated_at asc')
-      statement.execute(@last_updated_at - 1).each do |haveread|
+      result = db.xquery('SELECT updated_at, user_id, channel_id, message_id from haveread WHERE updated_at > ? order by updated_at asc', @last_updated_at - 1)
+      result.each do |haveread|
         message_id = haveread['message_id'.freeze]
         channel_id = haveread['channel_id'.freeze]
         channel_reads = @user_channel_reads[haveread['user_id'.freeze]] ||= Hash.new
         channel_reads[channel_id] = ChannelMessageIds.message_count_lte(channel_id, message_id)
         @last_updated_at = haveread['updated_at'.freeze]
       end
-      statement.close
     end
   end
 end
